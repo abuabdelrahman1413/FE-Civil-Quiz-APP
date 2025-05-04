@@ -21,25 +21,33 @@ export default function Home() {
 
   const handleSubjectChange = useCallback((subject: string, isChecked: boolean) => {
     setSelectedSubjects((prevSelected) => {
-      if (subject === ALL_SUBJECTS) {
-        // If "All Subjects" is checked, return only that.
-        // If it's unchecked (which shouldn't happen directly unless it's the only one), keep it as All.
-        return isChecked ? [ALL_SUBJECTS] : prevSelected;
-      }
-
       let newSelection: string[];
-      if (isChecked) {
-        // Add the subject, removing "All Subjects" if present.
-        newSelection = [...prevSelected.filter(s => s !== ALL_SUBJECTS), subject];
+
+      if (subject === ALL_SUBJECTS) {
+        // If "All Subjects" is checked, select only "All Subjects".
+        // If unchecked, clear the selection (will default back to "All Subjects" if empty).
+        newSelection = isChecked ? [ALL_SUBJECTS] : [];
       } else {
-        // Remove the subject.
-        newSelection = prevSelected.filter(s => s !== subject);
+        if (isChecked) {
+          // Add the subject, removing "All Subjects" if it's currently selected.
+          newSelection = [...prevSelected.filter(s => s !== ALL_SUBJECTS), subject];
+        } else {
+          // Remove the subject.
+          newSelection = prevSelected.filter(s => s !== subject);
+        }
       }
 
-      // If no specific subjects are selected, default back to "All Subjects".
+      // If the resulting selection is empty, default back to "All Subjects".
       if (newSelection.length === 0) {
         return [ALL_SUBJECTS];
       }
+
+      // If all specific subjects are selected, switch to just "All Subjects"
+      const allSpecificSubjects = subjectList.filter(s => s !== ALL_SUBJECTS);
+      if (!newSelection.includes(ALL_SUBJECTS) && newSelection.length === allSpecificSubjects.length) {
+         return [ALL_SUBJECTS];
+      }
+
 
       return newSelection;
     });
@@ -47,14 +55,17 @@ export default function Home() {
 
 
   const filteredQuestions = useMemo(() => {
+    // If "All Subjects" is selected or the selection somehow became empty, include all questions.
     if (selectedSubjects.includes(ALL_SUBJECTS) || selectedSubjects.length === 0) {
       return questions;
     }
+    // Otherwise, filter questions whose subject is in the selectedSubjects array.
     return questions.filter((q) => selectedSubjects.includes(q.subject));
   }, [selectedSubjects]);
 
   const handleStartQuiz = () => {
     if (filteredQuestions.length === 0) {
+      // This case should ideally not happen if defaulting to ALL_SUBJECTS works correctly.
       console.warn(`No questions available for selected subjects: ${selectedSubjects.join(', ')}`);
       return;
     }
@@ -100,7 +111,8 @@ export default function Home() {
     if (selectedSubjects.length > 3) {
         return `${selectedSubjects.length} subjects selected`;
     }
-    return selectedSubjects.join(', ');
+    // Sort for consistent display order
+    return [...selectedSubjects].sort().join(', ');
   }
 
   return (
@@ -129,18 +141,26 @@ export default function Home() {
                 <ScrollArea className="h-60 w-full rounded-md border p-4">
                   <div className="space-y-3">
                      {subjectList.map((subject) => {
-                      const isChecked = selectedSubjects.includes(subject);
-                      const isAllSubjectsOption = subject === ALL_SUBJECTS;
-                      const isDisabled = isAllSubjectsOption && selectedSubjects.length > 1 && !isChecked; // Disable "All" if others are checked
+                      // Determine checked state based on whether the subject is in the array
+                      // or if "All Subjects" is selected (which means everything is conceptually checked)
+                      const isChecked = selectedSubjects.includes(ALL_SUBJECTS) || selectedSubjects.includes(subject);
+                      // "All Subjects" is disabled only if it's the *sole* item selected.
+                      // This prevents unchecking it when it's the only way to represent "everything".
+                      // const isDisabled = subject === ALL_SUBJECTS && selectedSubjects.length === 1 && selectedSubjects[0] === ALL_SUBJECTS;
+                      const isDisabled = false; // Allow toggling "All Subjects" freely
 
                       return (
                         <div key={subject} className="flex items-center space-x-2">
                           <Checkbox
                             id={subject}
-                            checked={isChecked}
+                            // Use the direct membership check for the checkbox state,
+                            // but the 'isChecked' derived above might be useful elsewhere.
+                            checked={selectedSubjects.includes(subject) || selectedSubjects.includes(ALL_SUBJECTS)}
                             onCheckedChange={(checked) => handleSubjectChange(subject, !!checked)}
                             disabled={isDisabled}
                             aria-labelledby={`label-${subject}`}
+                            // For "All Subjects", indicate it controls others
+                            aria-controls={subject === ALL_SUBJECTS ? subjectList.filter(s => s !== ALL_SUBJECTS).join(' ') : undefined}
                           />
                           <Label
                             htmlFor={subject}
@@ -148,6 +168,7 @@ export default function Home() {
                             className={`flex-1 ${isDisabled ? 'text-muted-foreground cursor-not-allowed' : 'cursor-pointer'}`}
                           >
                             {subject}
+                            {/* Show count only for specific subjects */}
                             {subject !== ALL_SUBJECTS && ` (${questions.filter(q => q.subject === subject).length})`}
                           </Label>
                         </div>
@@ -155,9 +176,10 @@ export default function Home() {
                     })}
                   </div>
                 </ScrollArea>
-                 {filteredQuestions.length === 0 && !selectedSubjects.includes(ALL_SUBJECTS) && (
+                 {/* This message might be obsolete if the default logic works */}
+                 {/* {filteredQuestions.length === 0 && !selectedSubjects.includes(ALL_SUBJECTS) && (
                    <p className="text-sm text-destructive text-center">No questions available for the selected combination of subjects.</p>
-                 )}
+                 )} */}
                  <p className="text-sm text-muted-foreground text-center">
                    Selected: {getSelectedSubjectsText()}
                  </p>
@@ -167,6 +189,7 @@ export default function Home() {
                 <Button
                   onClick={handleStartQuiz}
                   className="w-full"
+                  // Disable button only if the final filtered list is empty (shouldn't happen with default)
                   disabled={filteredQuestions.length === 0}
                   aria-label={`Start quiz with ${filteredQuestions.length} questions from selected subjects`}
                 >
@@ -228,3 +251,4 @@ export default function Home() {
     </main>
   );
 }
+
