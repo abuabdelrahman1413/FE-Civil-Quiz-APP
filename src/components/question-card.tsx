@@ -3,11 +3,12 @@
 import type React from 'react';
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge'; // Import Badge
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { OptionButton } from '@/components/option-button';
 import type { Question } from '@/data/questions';
-import { motion, AnimatePresence } from 'framer-motion'; // Added for animations
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface QuestionCardProps {
   question: Question;
@@ -45,15 +46,17 @@ export function QuestionCard({
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg rounded-lg overflow-hidden">
       <CardHeader className="bg-muted/50 p-4 md:p-6">
-        <div className="flex justify-between items-center mb-2">
-           <CardTitle className="text-lg md:text-xl font-semibold leading-tight">
-             {question.text}
-           </CardTitle>
-           <span className="text-sm font-medium text-muted-foreground whitespace-nowrap ml-4">
-             {questionNumber} / {totalQuestions}
-           </span>
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex-1 mr-4">
+            <CardTitle className="text-lg md:text-xl font-semibold leading-tight mb-1">
+              {question.text}
+            </CardTitle>
+             <Badge variant="secondary" className="text-xs">{question.subject}</Badge> {/* Display Subject */}
+          </div>
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap mt-1">
+            {questionNumber} / {totalQuestions}
+          </span>
         </div>
-
       </CardHeader>
       <CardContent className="p-4 md:p-6 space-y-3">
         {question.options.map((option, index) => (
@@ -80,7 +83,7 @@ export function QuestionCard({
           >
             <Separator className="my-0" />
             <CardFooter className="flex flex-col items-start p-4 md:p-6 bg-secondary/30">
-               <h3 className="text-md font-semibold mb-2 text-foreground">Explanation</h3>
+              <h3 className="text-md font-semibold mb-2 text-foreground">Explanation</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {question.explanation}
               </p>
@@ -95,19 +98,6 @@ export function QuestionCard({
           </motion.div>
         )}
       </AnimatePresence>
-
-       {/* Show Next button immediately if needed, or only after answer */}
-       {/* {!isAnswered && (
-         <CardFooter className="p-4 md:p-6 justify-end">
-            <Button
-              className="transition-opacity duration-300"
-              onClick={onNextQuestion}
-              aria-label={isLastQuestion ? 'Finish Quiz' : 'Next Question'}
-            >
-              {isLastQuestion ? 'Finish Quiz' : 'Next Question'}
-            </Button>
-          </CardFooter>
-       )} */}
     </Card>
   );
 }
