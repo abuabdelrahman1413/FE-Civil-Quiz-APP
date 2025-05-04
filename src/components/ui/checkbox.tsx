@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -17,6 +18,8 @@ const Checkbox = React.forwardRef<
       className
     )}
     {...props}
+    // Ensure aria-labelledby is passed through if provided
+    aria-labelledby={props['aria-labelledby']}
   >
     <CheckboxPrimitive.Indicator
       className={cn("flex items-center justify-center text-current")}
