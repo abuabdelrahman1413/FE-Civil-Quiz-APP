@@ -9,27 +9,28 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-// Removed ScrollArea import as it's not currently used
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Import Select components
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils'; // Import the cn utility function
+import { cn } from '@/lib/utils';
 
 type QuizState = 'selecting' | 'playing' | 'completed';
+type QuestionCountOption = '10' | '20' | '50' | 'all';
 
 // Filter out 'All Subjects' if it exists in the imported list
 const specificSubjects = subjectList.filter(s => s !== 'All Subjects');
+const questionCountOptions: QuestionCountOption[] = ['10', '20', '50', 'all'];
 
 export default function Home() {
   const [quizState, setQuizState] = useState<QuizState>('selecting');
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]); // Start with empty selection
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [selectedQuestionCount, setSelectedQuestionCount] = useState<QuestionCountOption>('10'); // Default to 10 questions
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   const handleSubjectChange = useCallback((subject: string, isChecked: boolean) => {
     setSelectedSubjects((prevSelected) => {
       if (isChecked) {
-        // Add the subject if it's not already selected
         return prevSelected.includes(subject) ? prevSelected : [...prevSelected, subject];
       } else {
-        // Remove the subject
         return prevSelected.filter(s => s !== subject);
       }
     });
@@ -43,22 +44,26 @@ export default function Home() {
     setSelectedSubjects([]);
   }, []);
 
-  const filteredQuestions = useMemo(() => {
+  const availableQuestionsBySubject = useMemo(() => {
     if (selectedSubjects.length === 0) {
       return []; // No subjects selected, no questions
     }
     // Filter questions whose subject is in the selectedSubjects array.
-    // Shuffle the filtered questions
-    const shuffled = questions
-      .filter((q) => selectedSubjects.includes(q.subject))
-      .sort(() => Math.random() - 0.5);
-    return shuffled;
-
+    return questions.filter((q) => selectedSubjects.includes(q.subject));
   }, [selectedSubjects]);
+
+  const filteredQuestions = useMemo(() => {
+    const shuffled = [...availableQuestionsBySubject].sort(() => Math.random() - 0.5);
+    if (selectedQuestionCount === 'all' || shuffled.length === 0) {
+      return shuffled;
+    }
+    const count = parseInt(selectedQuestionCount, 10);
+    return shuffled.slice(0, count);
+  }, [availableQuestionsBySubject, selectedQuestionCount]);
+
 
   const handleStartQuiz = () => {
     if (filteredQuestions.length === 0) {
-       // Should be disabled, but as a fallback
       console.warn(`Cannot start quiz with 0 questions selected.`);
       return;
     }
@@ -76,16 +81,17 @@ export default function Home() {
 
   const handleRestartQuiz = () => {
     setQuizState('selecting');
-    setSelectedSubjects([]); // Reset selection to empty
+    setSelectedSubjects([]);
+    setSelectedQuestionCount('10'); // Reset question count to default
   };
 
   const currentQuestion = filteredQuestions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === filteredQuestions.length - 1;
 
   const pageVariants = {
-    initial: { opacity: 0, y: 20 }, // Slide from bottom
+    initial: { opacity: 0, y: 20 },
     in: { opacity: 1, y: 0 },
-    out: { opacity: 0, y: -20 }, // Slide to top
+    out: { opacity: 0, y: -20 },
   };
 
   const pageTransition = {
@@ -95,25 +101,19 @@ export default function Home() {
   };
 
   const getSelectedSubjectsText = () => {
-    if (selectedSubjects.length === 0) {
-      return 'None';
-    }
-    if (selectedSubjects.length === specificSubjects.length) {
-        return 'All Subjects';
-    }
-    if (selectedSubjects.length === 1) {
-      return selectedSubjects[0];
-    }
-    if (selectedSubjects.length > 3) {
-        return `${selectedSubjects.length} subjects selected`;
-    }
-    // Sort for consistent display order
+    if (selectedSubjects.length === 0) return 'None';
+    if (selectedSubjects.length === specificSubjects.length) return 'All Subjects';
+    if (selectedSubjects.length === 1) return selectedSubjects[0];
+    if (selectedSubjects.length > 3) return `${selectedSubjects.length} subjects selected`;
     return [...selectedSubjects].sort().join(', ');
   }
 
+   const maxQuestionsAvailable = availableQuestionsBySubject.length;
+   const actualQuizLength = filteredQuestions.length;
+
   return (
     <main className="flex min-h-screen flex-col items-center p-4 md:p-8 bg-gradient-to-br from-background to-muted/10">
-       <div className="w-full max-w-4xl"> {/* Container for centering content */}
+       <div className="w-full max-w-4xl">
         <header className="text-center mb-8 mt-4">
             <h1 className="text-3xl md:text-4xl font-bold text-primary">
                 Civil FE Exam Practice
@@ -132,74 +132,112 @@ export default function Home() {
                 exit="out"
                 variants={pageVariants}
                 transition={pageTransition}
-                className="w-full" // Takes full width of the max-w-4xl container
+                className="w-full"
             >
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl md:text-2xl font-semibold text-primary">Select Subjects</h2>
-                    <div className="space-x-2">
-                         <Button variant="outline" size="sm" onClick={handleSelectAll}>Select All</Button>
-                         <Button variant="outline" size="sm" onClick={handleClearAll}>Clear All</Button>
+                {/* Subject Selection */}
+                <div className="mb-8">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl md:text-2xl font-semibold text-primary">1. Select Subjects</h2>
+                        <div className="space-x-2">
+                            <Button variant="outline" size="sm" onClick={handleSelectAll}>Select All</Button>
+                            <Button variant="outline" size="sm" onClick={handleClearAll}>Clear All</Button>
+                        </div>
                     </div>
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {specificSubjects.map((subject) => {
+                            const isChecked = selectedSubjects.includes(subject);
+                            const SubjectIcon = getSubjectIcon(subject as Subject);
+                            const questionCount = questions.filter(q => q.subject === subject).length;
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                    {specificSubjects.map((subject) => {
-                        const isChecked = selectedSubjects.includes(subject);
-                        const SubjectIcon = getSubjectIcon(subject as Subject); // Get the icon component
-                        const questionCount = questions.filter(q => q.subject === subject).length;
-
-                        return (
-                            <div
-                                key={subject}
-                                className={cn(
-                                    "flex items-center space-x-3 rounded-md border p-3 transition-colors cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                                    isChecked ? "bg-accent/50 border-primary shadow-inner" : "bg-card shadow-sm" // Add shadow for depth
-                                )}
-                                onClick={() => handleSubjectChange(subject, !isChecked)} // Allow clicking the whole div
-                                role="checkbox"
-                                aria-checked={isChecked}
-                                tabIndex={0} // Make it focusable
-                                onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && handleSubjectChange(subject, !isChecked)} // Keyboard accessibility
-                            >
-                                <Checkbox
-                                    id={subject}
-                                    checked={isChecked}
-                                    onCheckedChange={(checked) => handleSubjectChange(subject, !!checked)}
-                                    aria-labelledby={`label-${subject}`}
-                                    className="border-muted-foreground data-[state=checked]:border-primary shrink-0" // Style checkbox border and prevent shrinking
-                                    tabIndex={-1} // Remove checkbox from tab order, parent div handles it
-                                />
-                                 {SubjectIcon && <SubjectIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
-                                <Label
-                                    htmlFor={subject} // Still associate label for screen readers
-                                    id={`label-${subject}`}
-                                    className="flex-1 text-sm font-medium cursor-pointer"
+                            return (
+                                <div
+                                    key={subject}
+                                    className={cn(
+                                        "flex items-center space-x-3 rounded-md border p-3 transition-colors cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                                        isChecked ? "bg-accent/50 border-primary shadow-inner" : "bg-card shadow-sm"
+                                    )}
+                                    onClick={() => handleSubjectChange(subject, !isChecked)}
+                                    role="checkbox"
+                                    aria-checked={isChecked}
+                                    tabIndex={0}
+                                    onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && handleSubjectChange(subject, !isChecked)}
                                 >
-                                    {subject}
-                                    {` (${questionCount})`}
-                                </Label>
-                            </div>
-                        );
-                    })}
+                                    <Checkbox
+                                        id={subject}
+                                        checked={isChecked}
+                                        onCheckedChange={(checked) => handleSubjectChange(subject, !!checked)}
+                                        aria-labelledby={`label-${subject}`}
+                                        className="border-muted-foreground data-[state=checked]:border-primary shrink-0"
+                                        tabIndex={-1}
+                                    />
+                                    {SubjectIcon && <SubjectIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
+                                    <Label
+                                        htmlFor={subject}
+                                        id={`label-${subject}`}
+                                        className="flex-1 text-sm font-medium cursor-pointer"
+                                    >
+                                        {subject}
+                                        {` (${questionCount})`}
+                                    </Label>
+                                </div>
+                            );
+                        })}
+                    </div>
+                     <p className="text-sm text-muted-foreground mt-3">
+                       Selected: <span className="font-medium text-foreground">{getSelectedSubjectsText()}</span> ({maxQuestionsAvailable} questions available)
+                     </p>
                 </div>
 
-                 <div className="text-center space-y-4">
-                     <p className="text-sm text-muted-foreground">
-                       Selected: <span className="font-medium text-foreground">{getSelectedSubjectsText()}</span>
-                     </p>
-                     <p className="text-sm text-muted-foreground">
-                       Total questions in selection: {filteredQuestions.length}
-                     </p>
-                    <Button
-                    onClick={handleStartQuiz}
-                    className="w-full max-w-xs mx-auto text-lg py-3 h-auto shadow-md hover:shadow-lg transition-shadow" // Larger button with shadow
-                    disabled={filteredQuestions.length === 0}
-                    aria-label={`Start quiz with ${filteredQuestions.length} questions from selected subjects`}
+                {/* Number of Questions Selection */}
+                <div className="mb-8">
+                    <h2 className="text-xl md:text-2xl font-semibold text-primary mb-4">2. Select Number of Questions</h2>
+                    <Select
+                        value={selectedQuestionCount}
+                        onValueChange={(value) => setSelectedQuestionCount(value as QuestionCountOption)}
+                        disabled={maxQuestionsAvailable === 0} // Disable if no subjects selected
                     >
-                    Start Quiz ({filteredQuestions.length})
+                        <SelectTrigger className="w-full max-w-xs mx-auto">
+                            <SelectValue placeholder="Number of questions" />
+                        </SelectTrigger>
+                        <SelectContent>
+                             {questionCountOptions.map((option) => {
+                                const numOption = option === 'all' ? maxQuestionsAvailable : parseInt(option, 10);
+                                const isDisabled = maxQuestionsAvailable === 0 || (option !== 'all' && maxQuestionsAvailable < numOption);
+                                const label = option === 'all' ? `All (${maxQuestionsAvailable})` : option;
+                                return (
+                                    <SelectItem key={option} value={option} disabled={isDisabled}>
+                                        {label} Questions
+                                    </SelectItem>
+                                );
+                             })}
+                        </SelectContent>
+                    </Select>
+                      {maxQuestionsAvailable > 0 && actualQuizLength !== maxQuestionsAvailable && selectedQuestionCount !== 'all' && (
+                        <p className="text-sm text-muted-foreground mt-2 text-center">
+                            {`Note: Only ${actualQuizLength} questions available for the selected subjects and count.`}
+                        </p>
+                    )}
+                </div>
+
+
+                 {/* Start Quiz Button */}
+                 <div className="text-center space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Quiz will contain: <span className="font-medium text-foreground">{actualQuizLength} questions</span>
+                    </p>
+                    <Button
+                        onClick={handleStartQuiz}
+                        className="w-full max-w-xs mx-auto text-lg py-3 h-auto shadow-md hover:shadow-lg transition-shadow"
+                        disabled={actualQuizLength === 0}
+                        aria-label={`Start quiz with ${actualQuizLength} questions`}
+                    >
+                        Start Quiz ({actualQuizLength})
                     </Button>
-                    {filteredQuestions.length === 0 && (
-                        <p className="text-sm text-destructive">Please select at least one subject to start the quiz.</p>
+                    {maxQuestionsAvailable === 0 && (
+                        <p className="text-sm text-destructive">Please select at least one subject.</p>
+                    )}
+                    {maxQuestionsAvailable > 0 && actualQuizLength === 0 && selectedQuestionCount !== 'all' && (
+                         <p className="text-sm text-destructive">Not enough questions available for the selected count. Choose fewer questions or 'All'.</p>
                     )}
                  </div>
 
@@ -208,7 +246,7 @@ export default function Home() {
 
             {quizState === 'playing' && currentQuestion && (
             <motion.div
-                key={currentQuestionIndex} // Key change triggers animation
+                key={currentQuestionIndex}
                 initial="initial"
                 animate="in"
                 exit="out"
@@ -219,7 +257,7 @@ export default function Home() {
                 <QuestionCard
                 question={currentQuestion}
                 questionNumber={currentQuestionIndex + 1}
-                totalQuestions={filteredQuestions.length}
+                totalQuestions={actualQuizLength} // Use actual quiz length
                 onNextQuestion={handleNextQuestion}
                 isLastQuestion={isLastQuestion}
                 />
@@ -234,7 +272,7 @@ export default function Home() {
                 exit="out"
                 variants={pageVariants}
                 transition={pageTransition}
-                className="w-full max-w-md mx-auto" // Center completion card
+                className="w-full max-w-md mx-auto"
             >
                 <Card className="text-center shadow-lg rounded-lg">
                 <CardHeader>
@@ -244,7 +282,7 @@ export default function Home() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-muted-foreground">
-                    You have answered all {filteredQuestions.length} questions for the selected subject(s): <span className="font-medium text-foreground">{getSelectedSubjectsText()}</span>.
+                    You have answered all {actualQuizLength} questions for the selected subject(s): <span className="font-medium text-foreground">{getSelectedSubjectsText()}</span>.
                     </p>
                     <Button onClick={handleRestartQuiz} className="w-full">
                     Take Another Quiz
@@ -258,4 +296,3 @@ export default function Home() {
     </main>
   );
 }
-
